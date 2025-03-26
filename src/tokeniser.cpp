@@ -1,21 +1,22 @@
-#include "parser.h"
+#include "pch.h"
+#include "tokeniser.h"
 
 argsArray tokenise(const wchar_t* input, int length)
 {
 	static int argsMax = 32;
-	static wchar_t** argv = (wchar_t**)alloc(argsMax * sizeof(wchar_t*));
+	static wchar_t** argv = new wchar_t*[argsMax];
 	int argc = 0;
 
-	static wchar_t* const basin = (wchar_t*)alloc(8192 * sizeof(wchar_t));
+	static wchar_t* const basin = new wchar_t[8192];
 	int basinIndex = 0;
-	int lastFlushIndex = 0;
+	int lastFlushIndex = basinIndex;
 
 	bool inString = false;
 	bool escaped = false;
 	bool escapedHex = false;
 	short hexValue = 0;
 
-	for (int i = 0; i < length + 1; i++)
+	for (int i = 0; i <= length; i++)
 	{
 		wchar_t c = input[i];
 
@@ -32,30 +33,47 @@ argsArray tokenise(const wchar_t* input, int length)
 		if (escapedHex)
 		{
 			if (c >= L'0' && c <= L'9') c -= L'0';
-			else if (std::tolower(c) >= L'a' && std::tolower(c) <= L'f') c = std::tolower(c) - L'a' + 10;
+			else if (lower(c) >= L'a' && lower(c) <= L'f') c = lower(c) - L'a' + 10;
 			else
 			{
-				basin[basinIndex++] = (wchar_t)hexValue;
+				basin[basinIndex++] = hexValue;
 				hexValue = 0;
 				escapedHex = false;
 			}
-			if (escapedHex) hexValue = hexValue * 16 + c;
-		}
-		if (!escapedHex) {
-			if (c == L' ' || c == '\t' || c == L'\0')
+			if (escapedHex)
 			{
-				if (basinIndex - lastFlushIndex != 0 || input[i - 1] == L'"')
-				{
-					basin[basinIndex++] = 0;
-					argv[argc++] = &basin[lastFlushIndex];
-					if (argc == argsMax) argv = (wchar_t**)HeapReAlloc(processHeap, NULL, argv, (argsMax *= 2) * sizeof(wchar_t*));
-					lastFlushIndex = basinIndex;
-				}
+				hexValue = hexValue * 16 + c;
+				continue;
 			}
-			else if (c == L'"') inString = !inString;
-			else if (c == L'\\' && inString) escaped = true;
-			else basin[basinIndex++] = c;
 		}
+		if ((c == L' ' || c == L'\t') && !inString || c == L'\0')
+		{
+			if (basinIndex - lastFlushIndex != 0 || input[i - 1] == L'"')
+			{
+				basin[basinIndex++] = 0;
+				argv[argc++] = &basin[lastFlushIndex];
+				if (argc == argsMax)
+				{
+					wchar_t** p = (wchar_t**)ralloc(argv, (argsMax *= 2) * sizeof(wchar_t*));
+					if (p == nullptr)
+					{
+						error(L"Could not re-allocate input buffer: too many arguments.");
+						return { 0, nullptr };
+					}
+					argv = p;
+				}
+				lastFlushIndex = basinIndex;
+			}
+		}
+		else if (c == L'"') inString = !inString;
+		else if (c == L'\\' && inString) escaped = true;
+		else basin[basinIndex++] = c;
+	}
+
+	if (inString)
+	{
+		error(L"Unmatched quotation mark.");
+		return { 0, nullptr };
 	}
 
 	return { argc, argv };

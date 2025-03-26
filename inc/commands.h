@@ -1,7 +1,4 @@
 #pragma once
-#include <string>
-#include <Windows.h>
-
 #include "file.h"
 #include "util.h"
 

@@ -1,8 +1,9 @@
+#include "pch.h"
 #include "file.h"
 
 wchar_t* getCurrentDirectory()
 {
-	static wchar_t* buffer = new wchar_t[256];
-	GetCurrentDirectory(256, buffer);
+	wchar_t* buffer = new wchar_t[MAX_PATH];
+	if (!GetCurrentDirectory(MAX_PATH, buffer)) return nullptr;
 	return buffer;
 }

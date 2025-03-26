@@ -1,15 +1,16 @@
+#include "pch.h"
 #include "tokeniser.h"
 
 static void run()
 {
-	wchar_t* input = (wchar_t*)alloc(8192 * sizeof(wchar_t));
+	wchar_t* input = new wchar_t[8194];
 	DWORD length = 0;
 	while (true)
 	{
 		const wchar_t* path = getCurrentDirectory();
-		print(path);
+		if (path != nullptr) print(path);
 		print(L"> ");
-		ReadConsole(StdIn, input, 8192, &length, NULL);
+		if (!ReadConsole(StdIn, input, 8194, &length, NULL)) error(L"Failed to read user input.", GetLastError());
 		input[length -= 2] = 0;
 
 		argsArray args = tokenise(input, length);
@@ -18,9 +19,9 @@ static void run()
 		commandFunction f = locateFunction(args.argv[0]);
 		if (f == nullptr)
 		{
-			std::wstring x = args.argv[0];
-			x = L"'" + x + L"' is not callable.";
-			error(x.c_str());
+			wchar_t* buffer = new wchar_t[wcslen(args.argv[0]) + 20]; // 20: sizeof(L"'' is not callable.")
+			wsprintf(buffer, L"'%s' is not callable.", args.argv[0]);
+			error(buffer);
 			continue;
 		}
 		f({ args.argc - 1, &args.argv[1] });
